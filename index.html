@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>きょうのふりかえりシート（視覚強化版）</title>
+    <title>きょうのふりかえりシート</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@400;500&display=swap" rel="stylesheet">
     <style>
         body {
@@ -72,14 +73,23 @@
         .locked-overlay {
             display: none;
             position: absolute;
-            top: 0; left: 0; right: 0; bottom: 120px;
+            top: 0; left: 0; right: 0; bottom: 150px; /* 下部のボタンエリアを避ける */
             z-index: 100;
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.01);
             cursor: not-allowed;
         }
         .is-locked .locked-overlay { display: block; }
-        .is-locked input, .is-locked textarea { background: #f1f5f9; cursor: not-allowed; }
-        .is-locked .card-choice { opacity: 0.7; pointer-events: none; }
+        .is-locked input, .is-locked textarea { background: #f8fafc; cursor: not-allowed; border-color: #e2e8f0; }
+        .is-locked .card-choice { opacity: 0.8; pointer-events: none; }
+
+        /* 保存ボタン用のアニメーション */
+        .btn-bounce {
+            animation: bounce 1s infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
 
         @media print {
             .no-print { display: none; }
@@ -103,7 +113,7 @@
             </div>
         </div>
 
-        <!-- 教科えらび -->
+        <!-- 1. 教科えらび -->
         <div class="mb-10">
             <p class="text-xl font-bold mb-4 text-gray-700 flex items-center gap-2">
                 <span class="bg-yellow-400 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm">1</span>
@@ -120,9 +130,8 @@
             </div>
         </div>
 
-        <!-- 評価と気持ち -->
+        <!-- 2&3 評価と気持ち -->
         <div class="space-y-10 mb-10">
-            <!-- できたかな -->
             <section>
                 <p class="text-xl font-bold mb-4 text-gray-700 flex items-center gap-2">
                     <span class="bg-blue-400 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm">2</span>
@@ -144,7 +153,6 @@
                 </div>
             </section>
 
-            <!-- 今日のきもち -->
             <section>
                 <p class="text-xl font-bold mb-4 text-gray-700 flex items-center gap-2">
                     <span class="bg-pink-400 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm">3</span>
@@ -167,17 +175,25 @@
             </section>
         </div>
 
-        <!-- 自由記述 -->
+        <!-- 4 自由記述 -->
         <div class="mb-10">
             <p class="text-xl font-bold mb-3 text-purple-600">💡 ひとこと メッセージ</p>
             <textarea id="memoInput" class="w-full border-4 border-purple-100 rounded-3xl h-32 p-4 text-xl focus:outline-none focus:border-purple-300" placeholder="がんばったことを おしえてね"></textarea>
         </div>
 
-        <!-- 操作ボタン -->
+        <!-- 操作ボタンエリア -->
         <div class="flex flex-col items-center gap-4 no-print border-t-4 border-dashed border-gray-100 pt-8">
-            <button id="lockBtn" onclick="toggleLock()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-5 px-16 rounded-full shadow-xl transition-all active:scale-95 text-2xl">
-                ✅ できた！
-            </button>
+            <div class="flex flex-col sm:flex-row gap-4 w-full justify-center items-center">
+                <!-- できた！・なおすボタン -->
+                <button id="lockBtn" onclick="toggleLock()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-5 px-12 rounded-full shadow-xl transition-all active:scale-95 text-2xl w-full sm:w-auto">
+                    ✅ できた！
+                </button>
+                
+                <!-- 保存ボタン（最初は非表示） -->
+                <button id="downloadBtn" onclick="downloadImage()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-5 px-12 rounded-full shadow-xl transition-all flex items-center justify-center gap-2 text-2xl w-full sm:w-auto btn-bounce" style="display: none;">
+                    <span>💾</span> ほぞんする
+                </button>
+            </div>
             <p id="hintText" class="text-gray-400 font-bold">おわったら 「できた！」を おしてね</p>
         </div>
     </div>
@@ -189,6 +205,7 @@
         function toggleLock() {
             const sheet = document.getElementById('mainSheet');
             const lockBtn = document.getElementById('lockBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
             const hintText = document.getElementById('hintText');
             const inputs = ['nameInput', 'dateInput', 'memoInput'];
 
@@ -198,12 +215,14 @@
                 sheet.classList.add('is-locked');
                 lockBtn.innerHTML = "✏️ なおす";
                 lockBtn.classList.replace('bg-green-500', 'bg-orange-400');
+                downloadBtn.style.display = 'flex';
                 hintText.innerHTML = "まちがえたときは 「なおす」を おしてね";
                 inputs.forEach(id => document.getElementById(id).disabled = true);
             } else {
                 sheet.classList.remove('is-locked');
                 lockBtn.innerHTML = "✅ できた！";
                 lockBtn.classList.replace('bg-orange-400', 'bg-green-500');
+                downloadBtn.style.display = 'none';
                 hintText.innerHTML = "おわったら 「できた！」を おしてね";
                 inputs.forEach(id => document.getElementById(id).disabled = false);
             }
@@ -220,6 +239,43 @@
             const items = group.querySelectorAll('.card-choice');
             items.forEach(item => item.classList.remove('selected'));
             el.classList.add('selected');
+        }
+
+        // 画像としてダウンロードする機能
+        async function downloadImage() {
+            const sheet = document.getElementById('mainSheet');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const lockBtn = document.getElementById('lockBtn');
+            
+            // 一時的にボタン類を非表示にする
+            const originalHintDisplay = document.getElementById('hintText').style.display;
+            document.getElementById('hintText').style.display = 'none';
+            
+            // 操作ボタンエリアを一時的に非表示（画像に入れたくない場合）
+            const footer = document.querySelector('.no-print');
+            footer.style.opacity = '0';
+
+            try {
+                const canvas = await html2canvas(sheet, {
+                    scale: 2, // 高画質
+                    backgroundColor: "#f8fafc",
+                    borderRadius: 40,
+                    // ボタン類が画像に入らないように調整
+                    ignoreElements: (element) => element.classList.contains('no-print')
+                });
+                
+                const link = document.createElement('a');
+                const name = document.getElementById('nameInput').value || 'ふりかえり';
+                link.download = `${name}_振り返りシート.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch (error) {
+                console.error('保存に失敗しました:', error);
+            } finally {
+                // 表示を戻す
+                document.getElementById('hintText').style.display = originalHintDisplay;
+                footer.style.opacity = '1';
+            }
         }
     </script>
 </body>
